@@ -41,3 +41,25 @@ PYTHONPATH=. python scripts/compare_baseline_motordock.py \
   --baseline-csv runs/baseline_debug/test_predictions.csv \
   --motordock-csv runs/motordock_se3_debug/test_predictions.csv \
   --out runs/motordock_se3_debug/baseline_vs_motordock.csv
+
+
+Milestone 5
+PYTHONPATH=. python scripts/train_representation_ablation.py \
+  --config configs/ablations/dual_quaternion.yaml
+
+PYTHONPATH=. python scripts/eval_representation_ablation.py \
+  --checkpoint runs/representation_ablation_debug/dual_quaternion/best.pt \
+  --config configs/ablations/dual_quaternion.yaml \
+  --split val \
+  --num-samples 5 \
+  --out runs/representation_ablation_debug/dual_quaternion/val_eval.csv
+
+PYTHONPATH=. python scripts/infer_representation_ablation.py \
+  --checkpoint runs/representation_ablation_debug/dual_quaternion/best.pt \
+  --config configs/ablations/dual_quaternion.yaml \
+  --split val \
+  --num-samples 5 \
+  --out runs/representation_ablation_debug/dual_quaternion/val_predictions.csv
+
+bash scripts/run_ablation_debug.sh
+

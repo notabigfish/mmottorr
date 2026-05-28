@@ -5,7 +5,7 @@ from motordock.geometry.se3 import se3_log_map
 
 
 def pair_residual_errors(T_pred: torch.Tensor, T_true: torch.Tensor, mask: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-    err = se3_log_map(torch.linalg.inv(T_pred) @ T_true)
+    err = se3_log_map(torch.linalg.inv(T_pred.float()) @ T_true.float())
     rot = torch.linalg.norm(err[..., :3], dim=-1)
     trans = torch.linalg.norm(err[..., 3:], dim=-1)
     m = mask.float()

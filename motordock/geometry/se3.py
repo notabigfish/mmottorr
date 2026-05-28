@@ -178,9 +178,9 @@ def project_to_so3(R: torch.Tensor) -> torch.Tensor:
     """Project nearly-orthogonal matrices to SO(3) using SVD and det(+1)."""
     if R.shape[-2:] != (3, 3):
         raise ValueError("R must have shape (...,3,3)")
-    U, _, Vh = torch.linalg.svd(R)
+    U, _, Vh = torch.linalg.svd(R.float())
     Rproj = U @ Vh
-    det = torch.det(Rproj)
+    det = torch.det(Rproj.float())
     neg = det < 0
     if torch.any(neg):
         U_adj = U.clone()
@@ -195,7 +195,7 @@ def is_valid_rotation(R: torch.Tensor, atol: float = 1e-4) -> torch.Tensor:
         raise ValueError("R must have shape (...,3,3)")
     I = torch.eye(3, dtype=R.dtype, device=R.device).expand(R.shape[:-2] + (3, 3))
     ortho = torch.linalg.norm(R.transpose(-1, -2) @ R - I, dim=(-2, -1))
-    det = torch.det(R)
+    det = torch.det(R.float())
     return (ortho <= atol) & (det > 0.0)
 
 

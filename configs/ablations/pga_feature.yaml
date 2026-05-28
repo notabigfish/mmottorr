@@ -1,0 +1,10 @@
+representation:
+  name: pga_feature
+  matrix_mode: 3x4
+  max_rotation_scale: 0.5
+  max_translation_scale: 5.0
+  parameter_budget_mode: matched
+output:
+  run_dir: runs/representation_ablation_debug/pga_feature
+representation:
+  note: passive PGA feature only; no sandwich action; no Clifford-specific claim

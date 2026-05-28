@@ -1,0 +1,63 @@
+seed: 42
+
+data:
+  csv_path: data/pdbbind/pdbbind_ft.csv
+  output_dir: data/pdbbind
+  split_train: train
+  split_val: val
+  max_train_examples: 128
+  max_val_examples: 32
+  require_pocket: true
+  max_ligand_atoms: 128
+  max_protein_residues: 1022
+  max_candidate_pairs: 16
+
+representation:
+  name: se3_log
+  matrix_mode: 3x4
+  max_rotation_scale: 0.5
+  max_translation_scale: 5.0
+  parameter_budget_mode: matched
+
+model:
+  hidden_dim: 128
+  num_layers: 2
+  dropout: 0.1
+  use_pair_attention: true
+  use_motor_auxiliary: true
+  disable_pair_context: false
+  freeze_baseline_encoder: false
+
+train:
+  batch_size: 4
+  num_workers: 2
+  epochs: 3
+  lr: 0.0003
+  weight_decay: 0.00001
+  grad_clip_norm: 1.0
+  use_amp: true
+  lambda_coord: 1.0
+  lambda_ligand_se3: 0.1
+  lambda_pair_motor: 0.05
+  lambda_confidence: 0.0
+  log_interval: 5
+  val_interval: 1
+
+pose_noise:
+  max_translation: 10.0
+  max_rotation_degrees: 180.0
+
+pair_perturbation:
+  enabled: true
+  prob: 0.5
+  max_rotation_degrees: 10.0
+  max_translation: 2.0
+
+eval:
+  num_samples: 5
+  success_threshold: 2.0
+  perturb_pairs: false
+
+output:
+  run_dir: runs/representation_ablation_debug/se3_log
+  save_every: 1
