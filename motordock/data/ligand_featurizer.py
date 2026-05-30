@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 import torch
-from rdkit import Chem
-
+from rdkit import Chem, RDLogger, rdBase
+RDLogger.DisableLog("rdApp.*")
+rdBase.DisableLog("rdApp.*")
 
 _HYB = [
     Chem.rdchem.HybridizationType.SP,
@@ -27,16 +28,16 @@ def _one_hot(value, vocab):
 def load_ligand_mol(ligand_file: str, sanitize: bool = False) -> Chem.Mol | None:
     p = Path(ligand_file)
     mol = None
-    if p.suffix.lower() == ".mol2":
-        mol = Chem.MolFromMol2File(str(p), sanitize=sanitize, removeHs=False)
-        if mol is None:
-            sdf = p.with_suffix(".sdf")
-            if sdf.exists():
-                sup = Chem.SDMolSupplier(str(sdf), sanitize=sanitize, removeHs=False)
-                mol = sup[0] if len(sup) > 0 else None
-    elif p.suffix.lower() == ".sdf":
-        sup = Chem.SDMolSupplier(str(p), sanitize=sanitize, removeHs=False)
+    sdf = p.with_suffix(".sdf")
+    if sdf.exists():
+        sup = Chem.SDMolSupplier(str(sdf), sanitize=sanitize, removeHs=False)
         mol = sup[0] if len(sup) > 0 else None
+    if mol is None:
+        mol2 = p.with_suffix(".mol2")
+        if mol2.exists():
+            mol = Chem.MolFromMol2File(str(p), sanitize=sanitize, removeHs=False)
+        if mol is None:
+            mol = Chem.MolFromMol2File(str(p), sanitize=False, removeHs=False)
     return mol
 
 
