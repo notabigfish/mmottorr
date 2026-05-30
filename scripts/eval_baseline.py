@@ -4,6 +4,7 @@ import argparse
 import yaml
 import torch
 from torch.utils.data import DataLoader
+from motordock.eval.posebusters_runner import run_posebusters_if_available
 
 from motordock.train.checkpointing import load_checkpoint
 from motordock.data import PDBBindBaselineDataset, baseline_collate_fn
@@ -19,6 +20,11 @@ if __name__ == "__main__":
     ap.add_argument("--num-samples", type=int, default=5)
     ap.add_argument("--sampler", choices=["diffusion", "one_step"], default="diffusion")
     ap.add_argument("--out", required=True)
+    ap.add_argument("--run-posebusters", action="store_true", default=False)
+    ap.add_argument("--posebusters-prediction-csv", default=None)
+    ap.add_argument("--posebusters-out", default=None)
+    ap.add_argument("--posebusters-export-dir", default=None)
+    ap.add_argument("--posebusters-config", choices=["redock", "dock", "mol"], default="redock")
     args = ap.parse_args()
 
     with open(args.config, "r", encoding="utf-8") as f:
@@ -57,4 +63,16 @@ if __name__ == "__main__":
     )
     import pandas as pd
     pd.DataFrame([res]).to_csv(args.out, index=False)
+    if args.run_posebusters:
+        if not args.posebusters_prediction_csv:
+            raise ValueError("--posebusters-prediction-csv is required when --run-posebusters is set")
+        pb_out = args.posebusters_out or str(args.out).replace(".csv", "_posebusters.csv")
+        pb_res = run_posebusters_if_available(
+            prediction_csv=args.posebusters_prediction_csv,
+            output_csv=pb_out,
+            export_dir=args.posebusters_export_dir,
+            config=args.posebusters_config,
+            full_report=True,
+        )
+        res["posebusters_available"] = pb_res.get("available", False)
     print(res)

@@ -96,3 +96,10 @@ bash scripts/run_ablation_debug.sh
 - Added differentiable torsion coordinate updates.
 - Added torsion diffusion noise, score target, loss, and sampler update.
 - Added tests for butane, benzene, angle wrapping, padding masks, and sampler integration.
+
+### PoseBusters execution
+- Replaced PoseBusters stub with real molecule export and PoseBusters API execution.
+- Added predicted ligand SDF export from template ligand plus predicted coordinates.
+- Added pb_valid and pb_valid_no_rmsd summary columns.
+- Added CLI script for PoseBusters evaluation.
+- Added tests for SDF export, input table creation, unavailable PoseBusters behavior, and mocked PoseBusters reporting.

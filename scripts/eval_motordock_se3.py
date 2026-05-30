@@ -7,6 +7,7 @@ from motordock.data.motordock_dataset import MotorDockSE3Dataset
 from motordock.data.motordock_collate import motordock_se3_collate_fn
 from motordock.models.motordock_se3_model import MotorDockSE3Model
 from motordock.data.pair_featurizer import pair_feature_dim
+from motordock.eval.posebusters_runner import run_posebusters_if_available
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
@@ -15,6 +16,11 @@ if __name__ == "__main__":
     ap.add_argument("--split", default="val")
     ap.add_argument("--num-samples", type=int, default=5)
     ap.add_argument("--out", required=True)
+    ap.add_argument("--run-posebusters", action="store_true", default=False)
+    ap.add_argument("--posebusters-prediction-csv", default=None)
+    ap.add_argument("--posebusters-out", default=None)
+    ap.add_argument("--posebusters-export-dir", default=None)
+    ap.add_argument("--posebusters-config", choices=["redock", "dock", "mol"], default="redock")
     args = ap.parse_args()
 
     cfg = yaml.safe_load(open(args.config, "r", encoding="utf-8"))
@@ -32,4 +38,15 @@ if __name__ == "__main__":
     m.to(dev)
     res = validate_motordock_multi_sample(m, dl, dev, num_samples=args.num_samples)
     pd.DataFrame([res]).to_csv(args.out, index=False)
+    if args.run_posebusters:
+        if not args.posebusters_prediction_csv:
+            raise ValueError("--posebusters-prediction-csv is required when --run-posebusters is set")
+        pb_out = args.posebusters_out or str(args.out).replace(".csv", "_posebusters.csv")
+        run_posebusters_if_available(
+            prediction_csv=args.posebusters_prediction_csv,
+            output_csv=pb_out,
+            export_dir=args.posebusters_export_dir,
+            config=args.posebusters_config,
+            full_report=True,
+        )
     print(res)
