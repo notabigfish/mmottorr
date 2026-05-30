@@ -25,12 +25,34 @@ def _pad_1d(tensors, dtype=torch.float32):
     return out
 
 
+def _pad_torsions(batch: list[dict], lig_nmax: int):
+    b = len(batch)
+    mmax = max(x["torsion_bond_atom_j"].shape[0] for x in batch)
+    bj = torch.zeros((b, mmax), dtype=torch.long)
+    bk = torch.zeros((b, mmax), dtype=torch.long)
+    vm = torch.zeros((b, mmax), dtype=torch.bool)
+    ang = torch.zeros((b, mmax), dtype=torch.float32)
+    am = torch.zeros((b, mmax, lig_nmax), dtype=torch.bool)
+    for i, x in enumerate(batch):
+        m = x["torsion_bond_atom_j"].shape[0]
+        if m == 0:
+            continue
+        bj[i, :m] = x["torsion_bond_atom_j"]
+        bk[i, :m] = x["torsion_bond_atom_k"]
+        vm[i, :m] = x["torsion_valid_mask"]
+        ang[i, :m] = x["torsion_angles_0"].float()
+        am_i = x["torsion_atom_mask"]
+        am[i, :m, : am_i.shape[1]] = am_i
+    return bj, bk, am, vm, ang
+
+
 def baseline_collate_fn(batch: list[dict]) -> dict:
     protein_feat, protein_mask = _pad_2d([x["protein_feat"] for x in batch])
     protein_ca, _ = _pad_2d([x["protein_ca"] for x in batch])
     ligand_feat, ligand_mask = _pad_2d([x["ligand_atom_feat"] for x in batch])
     ligand_true, _ = _pad_2d([x["ligand_coords_true"] for x in batch])
     ligand_start, _ = _pad_2d([x["ligand_coords_start"] for x in batch])
+    torsion_bond_atom_j, torsion_bond_atom_k, torsion_atom_mask, torsion_valid_mask, torsion_angles_0 = _pad_torsions(batch, ligand_feat.shape[1])
 
     return {
         "protein_feat": protein_feat,
@@ -45,6 +67,11 @@ def baseline_collate_fn(batch: list[dict]) -> dict:
         "pocket_center": torch.stack([x["pocket_center"] for x in batch], dim=0),
         "T_noise": torch.stack([x["T_noise"] for x in batch], dim=0),
         "T_target": torch.stack([x["T_target"] for x in batch], dim=0),
+        "torsion_bond_atom_j": torsion_bond_atom_j,
+        "torsion_bond_atom_k": torsion_bond_atom_k,
+        "torsion_atom_mask": torsion_atom_mask,
+        "torsion_valid_mask": torsion_valid_mask,
+        "torsion_angles_0": torsion_angles_0,
         "affinity": torch.tensor([x["affinity"] for x in batch], dtype=torch.float32),
         "pdb_id": [x["pdb_id"] for x in batch],
         "motordock_type": [x["motordock_type"] for x in batch],

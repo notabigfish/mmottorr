@@ -9,6 +9,11 @@ from torch.utils.data import Dataset
 from .ligand_featurizer import load_ligand_mol, get_ligand_coordinates, featurize_ligand_mol
 from .residue_featurizer import featurize_protein_sequence
 from .pose_noise import randomize_ligand_pose
+from motordock.chem.torsions import (
+    find_rotatable_bonds,
+    assert_atom_count_matches_coords,
+    torsion_angle_from_coords,
+)
 
 
 @dataclass
@@ -106,9 +111,29 @@ class PDBBindBaselineDataset(Dataset):
             raise SampleError(pdb_id, f"failed ligand parsing: {lig_file}")
 
         lig_coords_true = get_ligand_coordinates(mol).float()
+        assert_atom_count_matches_coords(mol, lig_coords_true)
         if lig_coords_true.shape[0] > self.max_ligand_atoms:
             raise SampleError(pdb_id, f"too many ligand atoms: {lig_coords_true.shape[0]}")
         lig_feat = featurize_ligand_mol(mol).float()
+
+        rot_bonds = find_rotatable_bonds(mol, mode="strict")
+        M = len(rot_bonds)
+        torsion_bond_atom_j = torch.zeros((M,), dtype=torch.long)
+        torsion_bond_atom_k = torch.zeros((M,), dtype=torch.long)
+        torsion_atom_mask = torch.zeros((M, lig_coords_true.shape[0]), dtype=torch.bool)
+        torsion_valid_mask = torch.ones((M,), dtype=torch.bool)
+        torsion_angles_0 = torch.zeros((M,), dtype=torch.float32)
+        for m, rb in enumerate(rot_bonds):
+            torsion_bond_atom_j[m] = int(rb.atom_j)
+            torsion_bond_atom_k[m] = int(rb.atom_k)
+            torsion_atom_mask[m] = torch.tensor(rb.rotate_atom_mask, dtype=torch.bool)
+            torsion_angles_0[m] = torsion_angle_from_coords(
+                lig_coords_true,
+                rb.atom_i,
+                rb.atom_j,
+                rb.atom_k,
+                rb.atom_l,
+            )
 
         if validate_only:
             return None
@@ -151,6 +176,11 @@ class PDBBindBaselineDataset(Dataset):
             "ligand_mask": torch.ones(lig_coords_true.shape[0], dtype=torch.bool),
             "T_noise": T_noise.float(),
             "T_target": T_target.float(),
+            "torsion_bond_atom_j": torsion_bond_atom_j,
+            "torsion_bond_atom_k": torsion_bond_atom_k,
+            "torsion_atom_mask": torsion_atom_mask,
+            "torsion_valid_mask": torsion_valid_mask,
+            "torsion_angles_0": torsion_angles_0,
             "affinity": float(row.get("affinity", 0.0)),
         }
 

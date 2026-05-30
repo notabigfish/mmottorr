@@ -114,6 +114,7 @@ def train_diffusion_baseline(config: dict):
             "loss",
             "tr_loss",
             "rot_loss",
+            "tor_loss",
             "lr",
         ])
 

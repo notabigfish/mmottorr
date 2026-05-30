@@ -11,6 +11,8 @@ class DiffusionSchedule:
         sigma_tr_max: float,
         sigma_rot_min: float,
         sigma_rot_max: float,
+        sigma_tor_min: float = 0.0314,
+        sigma_tor_max: float = 3.1416,
         schedule_type: str = "log_linear",
     ):
         if num_steps <= 0:
@@ -22,6 +24,8 @@ class DiffusionSchedule:
         self.sigma_tr_max = float(sigma_tr_max)
         self.sigma_rot_min = float(sigma_rot_min)
         self.sigma_rot_max = float(sigma_rot_max)
+        self.sigma_tor_min = float(sigma_tor_min)
+        self.sigma_tor_max = float(sigma_tor_max)
         self.schedule_type = schedule_type
 
     def sigma_tr(self, t: torch.Tensor) -> torch.Tensor:
@@ -29,6 +33,9 @@ class DiffusionSchedule:
 
     def sigma_rot(self, t: torch.Tensor) -> torch.Tensor:
         return self.sigma_rot_min * (self.sigma_rot_max / self.sigma_rot_min) ** t
+
+    def sigma_tor(self, t: torch.Tensor) -> torch.Tensor:
+        return self.sigma_tor_min * (self.sigma_tor_max / self.sigma_tor_min) ** t
 
     def timesteps(self, device: torch.device | None = None) -> torch.Tensor:
         return torch.linspace(1.0, 0.0, self.num_steps + 1, device=device)

@@ -90,3 +90,9 @@ bash scripts/run_ablation_debug.sh
 - Added dedicated end-to-end diffusion trainer: `scripts/train_diffusion_baseline.py`.
 - Adds diffusion-native validation with score loss and sampler-based RMSD metrics.
 - Produces diffusion checkpoints (`model_type: diffusion_baseline`) for direct `--sampler diffusion` eval/infer.
+
+### Ligand torsion modeling
+- Added RDKit-based rotatable bond detection.
+- Added differentiable torsion coordinate updates.
+- Added torsion diffusion noise, score target, loss, and sampler update.
+- Added tests for butane, benzene, angle wrapping, padding masks, and sampler integration.

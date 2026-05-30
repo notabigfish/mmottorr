@@ -4,6 +4,7 @@ import torch
 
 from motordock.diffusion.noise_schedule import DiffusionSchedule
 from motordock.diffusion.rigid_pose import center_of_mass, apply_rigid_update, random_translation, random_rotation_vec
+from motordock.diffusion.torsion import apply_torsion_updates, wrap_angle
 from motordock.data.pose_noise import sample_random_ligand_transform, apply_transform_to_points
 
 
@@ -94,16 +95,19 @@ class DiffusionPoseSampler:
 
             sigma_tr = self.schedule.sigma_tr(t_i).expand(x.shape[0]).to(x.dtype)
             sigma_rot = self.schedule.sigma_rot(t_i).expand(x.shape[0]).to(x.dtype)
+            sigma_tor = self.schedule.sigma_tor(t_i).expand(x.shape[0]).to(x.dtype)
 
             step_batch = {k: v for k, v in rb.items() if not k.startswith("_")}
             step_batch["ligand_coords_t"] = x
             step_batch["sigma_tr"] = sigma_tr
             step_batch["sigma_rot"] = sigma_rot
+            step_batch["sigma_tor"] = sigma_tor
             step_batch["t"] = torch.full((x.shape[0],), float(t_i.item()), device=x.device, dtype=x.dtype)
 
             out = self.model(step_batch)
             s_tr = out["tr_score_pred"]
             s_rot = out["rot_score_pred"]
+            s_tor = out.get("tor_score_pred", None)
 
             tr_upd = dt * (sigma_tr[:, None] ** 2) * s_tr
             rot_upd = dt * (sigma_rot[:, None] ** 2) * s_rot
@@ -119,6 +123,20 @@ class DiffusionPoseSampler:
 
             ctr = center_of_mass(x, rb["ligand_mask"])
             x = apply_rigid_update(x, rot_upd, tr_upd, ctr)
+
+            if s_tor is not None and "torsion_valid_mask" in rb and rb["torsion_valid_mask"].shape[1] > 0:
+                tor_upd = dt * (sigma_tor[:, None] ** 2) * s_tor
+                if not self.deterministic:
+                    z_tor = torch.randn_like(tor_upd)
+                    tor_upd = tor_upd + torch.sqrt(2.0 * dt) * sigma_tor[:, None] * z_tor
+                tor_upd = wrap_angle(tor_upd)
+                tor_upd = torch.where(rb["torsion_valid_mask"], tor_upd, torch.zeros_like(tor_upd))
+                x = apply_torsion_updates(
+                    x,
+                    {"atom_j": rb["torsion_bond_atom_j"], "atom_k": rb["torsion_bond_atom_k"]},
+                    rb["torsion_atom_mask"],
+                    tor_upd,
+                )
             if save_trajectory:
                 traj.append(x.clone())
 
@@ -126,6 +144,7 @@ class DiffusionPoseSampler:
         final_batch["ligand_coords_t"] = x
         final_batch["sigma_tr"] = self.schedule.sigma_tr(torch.tensor(0.0, device=x.device)).expand(x.shape[0]).to(x.dtype)
         final_batch["sigma_rot"] = self.schedule.sigma_rot(torch.tensor(0.0, device=x.device)).expand(x.shape[0]).to(x.dtype)
+        final_batch["sigma_tor"] = self.schedule.sigma_tor(torch.tensor(0.0, device=x.device)).expand(x.shape[0]).to(x.dtype)
         conf = self.model(final_batch)["confidence_logit"]
 
         coords = x.view(B, S, *x.shape[1:])

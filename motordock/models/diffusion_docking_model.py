@@ -24,6 +24,8 @@ class DiffusionDockingModel(nn.Module):
         self.tr_head = nn.Linear(hidden_dim, 3)
         self.rot_head = nn.Linear(hidden_dim, 3)
         self.conf_head = nn.Linear(hidden_dim, 1)
+        self.tor_mlp = MLP(hidden_dim * 4 + sigma_emb_dim, hidden_dim, hidden_dim, num_layers=2, dropout=dropout)
+        self.tor_head = nn.Linear(hidden_dim, 1)
 
     def forward(self, batch: dict) -> dict:
         pc = batch["pocket_center"][:, None, :]
@@ -54,8 +56,29 @@ class DiffusionDockingModel(nn.Module):
         rot_score = self.rot_head(joint)
         conf = self.conf_head(joint).squeeze(-1)
 
+        # torsion score head
+        j_idx = batch.get("torsion_bond_atom_j", None)
+        k_idx = batch.get("torsion_bond_atom_k", None)
+        valid = batch.get("torsion_valid_mask", None)
+        if j_idx is not None and k_idx is not None and valid is not None:
+            B, M = j_idx.shape
+            if M > 0:
+                gather_j = j_idx.unsqueeze(-1).expand(-1, -1, l_h.shape[-1])
+                gather_k = k_idx.unsqueeze(-1).expand(-1, -1, l_h.shape[-1])
+                h_j = torch.gather(l_h, 1, gather_j)
+                h_k = torch.gather(l_h, 1, gather_k)
+                t_rep = t_emb.unsqueeze(1).expand(-1, M, -1)
+                h_tor = torch.cat([h_j, h_k, h_j * h_k, h_j - h_k, t_rep], dim=-1)
+                tor_score = self.tor_head(self.tor_mlp(h_tor)).squeeze(-1)
+                tor_score = torch.where(valid, tor_score, torch.zeros_like(tor_score))
+            else:
+                tor_score = torch.zeros((B, 0), device=joint.device, dtype=joint.dtype)
+        else:
+            tor_score = torch.zeros((joint.shape[0], 0), device=joint.device, dtype=joint.dtype)
+
         return {
             "tr_score_pred": tr_score,
             "rot_score_pred": rot_score,
+            "tor_score_pred": tor_score,
             "confidence_logit": conf,
         }

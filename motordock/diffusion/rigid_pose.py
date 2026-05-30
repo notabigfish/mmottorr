@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import torch
+from motordock.diffusion.torsion import perturb_torsions
 
 
 def _skew(v: torch.Tensor) -> torch.Tensor:
@@ -108,7 +109,23 @@ def prepare_diffusion_batch_targets(
     out["target_rot_score"] = target_rot_score
     out["sigma_tr"] = sigma_tr
     out["sigma_rot"] = sigma_rot
-    # torsion extension hooks
-    out.setdefault("torsion_target", None)
-    out.setdefault("torsion_sigma", None)
+
+    # optional torsion diffusion
+    if "torsion_angles_0" in batch and "torsion_valid_mask" in batch:
+        sigma_tor = batch.get("sigma_tor", None)
+        if sigma_tor is None:
+            sigma_tor = torch.full_like(sigma_tr, 0.0314)
+        phi_t, eps_tor, target_tor_score = perturb_torsions(
+            batch["torsion_angles_0"],
+            sigma_tor,
+            batch["torsion_valid_mask"],
+        )
+        out["torsion_angles_t"] = phi_t
+        out["eps_tor"] = eps_tor
+        out["target_tor_score"] = target_tor_score
+        out["sigma_tor"] = sigma_tor
+    else:
+        out.setdefault("torsion_angles_t", None)
+        out.setdefault("target_tor_score", None)
+        out.setdefault("sigma_tor", None)
     return out

@@ -7,6 +7,7 @@ from .rigid_pose import (
     perturb_rigid_pose,
     prepare_diffusion_batch_targets,
 )
+from .torsion import wrap_angle, apply_torsion_updates, perturb_torsions, torsion_score_loss
 
 __all__ = [
     "DiffusionSchedule",
@@ -16,4 +17,8 @@ __all__ = [
     "random_translation",
     "perturb_rigid_pose",
     "prepare_diffusion_batch_targets",
+    "wrap_angle",
+    "apply_torsion_updates",
+    "perturb_torsions",
+    "torsion_score_loss",
 ]

@@ -39,12 +39,15 @@ def validate_diffusion_loss(model, dataloader, device, config: dict) -> dict:
     losses = []
     tr_losses = []
     rot_losses = []
+    tor_losses = []
     for batch in dataloader:
         b = _to_device(batch, device)
         B = b["protein_feat"].shape[0]
         t = _sample_t(B, device=device, dtype=b["protein_feat"].dtype)
         sigma_tr, sigma_rot = _sigmas(schedule, t)
+        sigma_tor = schedule.sigma_tor(t)
         bt = prepare_diffusion_batch_targets(b, sigma_tr, sigma_rot)
+        bt["sigma_tor"] = sigma_tor
 
         out = model(bt)
         ld = diffusion_rigid_loss(
@@ -52,17 +55,21 @@ def validate_diffusion_loss(model, dataloader, device, config: dict) -> dict:
             bt,
             bt["sigma_tr"],
             bt["sigma_rot"],
+            sigma_tor=bt.get("sigma_tor", None),
             lambda_tr=float(tcfg.get("lambda_tr", 1.0)),
             lambda_rot=float(tcfg.get("lambda_rot", 1.0)),
+            lambda_tor=float(tcfg.get("lambda_tor", 1.0)),
         )
         losses.append(float(ld["total"].item()))
         tr_losses.append(float(ld["tr_loss"].item()))
         rot_losses.append(float(ld["rot_loss"].item()))
+        tor_losses.append(float(ld.get("tor_loss", ld["total"] * 0.0).item()))
 
     return {
         "val_diffusion_loss": float(sum(losses) / max(len(losses), 1)),
         "val_tr_loss": float(sum(tr_losses) / max(len(tr_losses), 1)),
         "val_rot_loss": float(sum(rot_losses) / max(len(rot_losses), 1)),
+        "val_tor_loss": float(sum(tor_losses) / max(len(tor_losses), 1)),
     }
 
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import torch
 from motordock.geometry.se3 import se3_geodesic_loss
+from motordock.diffusion.torsion import torsion_score_loss
 
 
 def masked_coord_mse(pred: torch.Tensor, target: torch.Tensor, mask: torch.Tensor, reduction: str = "mean") -> torch.Tensor:
@@ -35,8 +36,10 @@ def diffusion_rigid_loss(
     batch_targets: dict,
     sigma_tr: torch.Tensor,
     sigma_rot: torch.Tensor,
+    sigma_tor: torch.Tensor | None = None,
     lambda_tr: float = 1.0,
     lambda_rot: float = 1.0,
+    lambda_tor: float = 1.0,
 ) -> dict:
     s_tr_hat = model_out["tr_score_pred"]
     s_rot_hat = model_out["rot_score_pred"]
@@ -48,5 +51,21 @@ def diffusion_rigid_loss(
 
     l_tr = (tr_w * (s_tr_hat - s_tr_tgt).pow(2).sum(dim=-1, keepdim=True)).mean()
     l_rot = (rot_w * (s_rot_hat - s_rot_tgt).pow(2).sum(dim=-1, keepdim=True)).mean()
-    total = lambda_tr * l_tr + lambda_rot * l_rot
-    return {"total": total, "tr_loss": l_tr, "rot_loss": l_rot}
+    l_tor = s_tr_hat.sum() * 0.0
+
+    if (
+        "tor_score_pred" in model_out
+        and "target_tor_score" in batch_targets
+        and batch_targets["target_tor_score"] is not None
+        and sigma_tor is not None
+        and "torsion_valid_mask" in batch_targets
+    ):
+        l_tor = torsion_score_loss(
+            model_out["tor_score_pred"],
+            batch_targets["target_tor_score"],
+            sigma_tor,
+            batch_targets["torsion_valid_mask"],
+        )
+
+    total = lambda_tr * l_tr + lambda_rot * l_rot + lambda_tor * l_tor
+    return {"total": total, "tr_loss": l_tr, "rot_loss": l_rot, "tor_loss": l_tor}
