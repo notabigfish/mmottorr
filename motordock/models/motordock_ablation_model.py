@@ -9,7 +9,7 @@ from .pair_encoder import PairEncoder, PairAttentionPool
 from .representation_registry import get_representation_spec
 from .representation_adapters import (
     SE3LogAdapter, QuaternionTranslationAdapter, DualQuaternionAdapter, MatrixAdapter,
-    CentroidBiasAdapter, RandomMotorAdapter, PGAFeatureAdapter,
+    CentroidBiasAdapter, RandomMotorAdapter, PGAFeatureAdapter, PGASandwichAdapter,
 )
 
 
@@ -43,7 +43,9 @@ class MotorDockAblationModel(nn.Module):
         elif representation == "random_motor":
             self.adapter = RandomMotorAdapter(pair_hidden_dim=hidden_dim, joint_hidden_dim=hidden_dim, max_rotation_scale=max_rotation_scale, max_translation_scale=max_translation_scale)
         elif representation == "pga_feature":
-            self.adapter = PGAFeatureAdapter()
+            self.adapter = PGAFeatureAdapter(pair_hidden_dim=hidden_dim, joint_hidden_dim=hidden_dim)
+        elif representation in {"pga_sandwich", "motordock_pga"}:
+            self.adapter = PGASandwichAdapter(pair_hidden_dim=hidden_dim, joint_hidden_dim=hidden_dim)
         else:
             raise ValueError(representation)
 
@@ -79,6 +81,13 @@ class MotorDockAblationModel(nn.Module):
             pair_attn = batch["pair_mask"].float() / den
             pair_ctx = (pair_h * pair_attn.unsqueeze(-1)).sum(dim=1)
 
+        if self.representation_name in {"pga_feature", "pga_sandwich", "motordock_pga"} and "pga_context" in ad:
+            pga_ctx = ad["pga_context"]
+            if pga_ctx.dim() == 3:
+                pair_ctx = (pga_ctx * pair_attn.unsqueeze(-1)).sum(dim=1)
+            else:
+                pair_ctx = pga_ctx
+
         if self.disable_pair_context:
             joint = self.fuse(torch.cat([p_ctx, l_ctx], dim=-1))
         else:
@@ -89,7 +98,7 @@ class MotorDockAblationModel(nn.Module):
         lig_pred = apply_transform_to_points(delta, batch["ligand_coords_start"])
         conf = self.conf_head(joint).squeeze(-1)
 
-        return {
+        out = {
             "xi_pred": xi,
             "delta_T_pred": delta,
             "ligand_coords_pred": lig_pred,
@@ -102,3 +111,7 @@ class MotorDockAblationModel(nn.Module):
             "pair_T_corrected": ad["pair_T_corrected"],
             "representation_name": self.representation_name,
         }
+        for k in ["pga_motor", "pga_motor_features", "pga_context", "pga_transformed_points", "pga_action_features"]:
+            if k in ad:
+                out[k] = ad[k]
+        return out

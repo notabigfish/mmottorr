@@ -9,7 +9,7 @@ def test_pair_motor_loss_zero_for_identical_transforms():
 
 
 def test_pair_motor_loss_ignores_padded_pairs():
-    T = torch.eye(4).view(1,2,4,4).repeat(1,1,1,1)
+    T = torch.eye(4).repeat(1, 2, 1, 1)
     loss = masked_pair_motor_loss(T, T, torch.tensor([[1,0]], dtype=torch.bool))
     assert abs(float(loss.item())) < 1e-6
 

@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import torch
 import torch.nn as nn
-from motordock.geometry.se3 import se3_exp_map
+from motordock.geometry.se3 import se3_exp_map, se3_log_map
 from motordock.geometry.representation_conversions import representation_to_transform
 from motordock.geometry.quaternion import normalize_quaternion, standardize_quaternion_sign
 from motordock.geometry.dual_quaternion import normalize_dual_quaternion, standardize_dual_quaternion_sign
 from motordock.geometry.matrix_representation import matrix_features_to_transform
+from .pga_adapter import PGAFeatureAdapter as _PGAFeatureCore, PGASandwichAdapter as _PGASandwichCore
 
 
 class BaseRepresentationAdapter(nn.Module):
@@ -32,8 +33,8 @@ class _CommonAdapter(BaseRepresentationAdapter):
         I = torch.eye(4, device=delta.device, dtype=delta.dtype)
         invalid = ~pair_mask
         rep = rep.masked_fill(invalid.unsqueeze(-1), 0.0)
-        delta = torch.where(invalid.unsqueeze(-1).unsqueeze(-1), I.view(1,1,4,4), delta)
-        corrected = torch.where(invalid.unsqueeze(-1).unsqueeze(-1), I.view(1,1,4,4), corrected)
+        delta = torch.where(invalid.unsqueeze(-1).unsqueeze(-1), I.view(1, 1, 4, 4), delta)
+        corrected = torch.where(invalid.unsqueeze(-1).unsqueeze(-1), I.view(1, 1, 4, 4), corrected)
         return rep, delta, corrected
 
 
@@ -63,9 +64,10 @@ class QuaternionTranslationAdapter(_CommonAdapter):
         rep = torch.cat([q, t], dim=-1)
         delta = representation_to_transform(rep.view(-1, 7), "quaternion_translation").view(*rep.shape[:-1], 4, 4)
         corrected = delta @ pair_T_input
-        xi = se3_exp_map(torch.zeros_like(pair_h[..., :6]).view(-1, 6)).view(*rep.shape[:-1], 4, 4)
         rep, delta, corrected = self._mask_id(rep, delta, corrected, pair_mask)
-        return {"pair_rep_pred": rep, "pair_xi_pred": torch.zeros(*rep.shape[:-1], 6, device=rep.device), "pair_delta_T_pred": delta, "pair_T_corrected": corrected}
+        xi = se3_log_map(delta.view(-1, 4, 4)).view(*rep.shape[:-1], 6)
+        xi = xi.masked_fill((~pair_mask).unsqueeze(-1), 0.0)
+        return {"pair_rep_pred": rep, "pair_xi_pred": xi, "pair_delta_T_pred": delta, "pair_T_corrected": corrected}
 
 
 class DualQuaternionAdapter(_CommonAdapter):
@@ -78,7 +80,9 @@ class DualQuaternionAdapter(_CommonAdapter):
         delta = representation_to_transform(rep.view(-1, 8), "dual_quaternion").view(*rep.shape[:-1], 4, 4)
         corrected = delta @ pair_T_input
         rep, delta, corrected = self._mask_id(rep, delta, corrected, pair_mask)
-        return {"pair_rep_pred": rep, "pair_xi_pred": torch.zeros(*rep.shape[:-1], 6, device=rep.device), "pair_delta_T_pred": delta, "pair_T_corrected": corrected}
+        xi = se3_log_map(delta.view(-1, 4, 4)).view(*rep.shape[:-1], 6)
+        xi = xi.masked_fill((~pair_mask).unsqueeze(-1), 0.0)
+        return {"pair_rep_pred": rep, "pair_xi_pred": xi, "pair_delta_T_pred": delta, "pair_T_corrected": corrected}
 
 
 class MatrixAdapter(_CommonAdapter):
@@ -92,20 +96,58 @@ class MatrixAdapter(_CommonAdapter):
         delta = matrix_features_to_transform(rep.view(-1, rep.shape[-1]), mode=self.matrix_mode).view(*rep.shape[:-1], 4, 4)
         corrected = delta @ pair_T_input
         rep, delta, corrected = self._mask_id(rep, delta, corrected, pair_mask)
-        return {"pair_rep_pred": rep, "pair_xi_pred": torch.zeros(*rep.shape[:-1], 6, device=rep.device), "pair_delta_T_pred": delta, "pair_T_corrected": corrected}
+        xi = se3_log_map(delta.view(-1, 4, 4)).view(*rep.shape[:-1], 6)
+        xi = xi.masked_fill((~pair_mask).unsqueeze(-1), 0.0)
+        return {"pair_rep_pred": rep, "pair_xi_pred": xi, "pair_delta_T_pred": delta, "pair_T_corrected": corrected}
 
 
 class CentroidBiasAdapter(BaseRepresentationAdapter):
     def forward(self, pair_h, ligand_context, protein_context, pair_T_input, pair_mask):
         B, C, _ = pair_h.shape
-        I = torch.eye(4, device=pair_h.device, dtype=pair_h.dtype).view(1,1,4,4).repeat(B,C,1,1)
+        I = torch.eye(4, device=pair_h.device, dtype=pair_h.dtype).view(1, 1, 4, 4).repeat(B, C, 1, 1)
         rep = torch.zeros(B, C, 1, device=pair_h.device, dtype=pair_h.dtype)
-        return {"pair_rep_pred": rep, "pair_xi_pred": torch.zeros(B, C, 6, device=pair_h.device), "pair_delta_T_pred": I, "pair_T_corrected": pair_T_input}
+        return {"pair_rep_pred": rep, "pair_xi_pred": torch.zeros(B, C, 6, device=pair_h.device, dtype=pair_h.dtype), "pair_delta_T_pred": I, "pair_T_corrected": pair_T_input}
 
 
 class RandomMotorAdapter(SE3LogAdapter):
     pass
 
 
-class PGAFeatureAdapter(CentroidBiasAdapter):
-    pass
+class PGAFeatureAdapter(BaseRepresentationAdapter):
+    def __init__(self, pair_hidden_dim=256, joint_hidden_dim=256, include_full=False, **_kw):
+        super().__init__()
+        self.core = _PGAFeatureCore(in_dim=pair_hidden_dim, hidden_dim=joint_hidden_dim, out_dim=pair_hidden_dim, include_full=include_full)
+
+    def forward(self, pair_h, ligand_context, protein_context, pair_T_input, pair_mask):
+        out = self.core({"pair_T_initial": pair_T_input, "pair_h": pair_h})
+        B, C, _ = pair_h.shape
+        I = torch.eye(4, device=pair_h.device, dtype=pair_h.dtype).view(1, 1, 4, 4).expand(B, C, 4, 4)
+        xi = torch.zeros(B, C, 6, device=pair_h.device, dtype=pair_h.dtype)
+        xi = xi.masked_fill((~pair_mask).unsqueeze(-1), 0.0)
+        rep = out["pga_motor_features"].masked_fill((~pair_mask).unsqueeze(-1), 0.0)
+        return {
+            "pair_rep_pred": rep,
+            "pair_xi_pred": xi,
+            "pair_delta_T_pred": I,
+            "pair_T_corrected": pair_T_input,
+            "pga_motor": out["pga_motor"],
+            "pga_motor_features": out["pga_motor_features"],
+            "pga_context": out["pga_context"],
+        }
+
+
+class PGASandwichAdapter(BaseRepresentationAdapter):
+    def __init__(self, pair_hidden_dim=256, joint_hidden_dim=256, primitive_mode="canonical_points", **_kw):
+        super().__init__()
+        self.se3 = SE3LogAdapter(pair_hidden_dim=pair_hidden_dim, joint_hidden_dim=joint_hidden_dim)
+        self.core = _PGASandwichCore(in_dim=pair_hidden_dim, hidden_dim=joint_hidden_dim, out_dim=pair_hidden_dim, primitive_mode=primitive_mode)
+
+    def forward(self, pair_h, ligand_context, protein_context, pair_T_input, pair_mask):
+        se3_out = self.se3(pair_h, ligand_context, protein_context, pair_T_input, pair_mask)
+        pga = self.core({
+            "pair_T_initial": pair_T_input,
+            "pair_T_corrected": se3_out["pair_T_corrected"],
+            "pair_h": pair_h,
+        })
+        se3_out.update(pga)
+        return se3_out

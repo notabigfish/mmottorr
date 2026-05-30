@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import torch
 from motordock.geometry.representation_conversions import transform_to_representation, representation_dim
+from motordock.geometry.pga_motor import se3_to_motor, motor_to_features
 from motordock.data.pair_featurizer import _PAIR_TYPES, _UNIT_TYPES
 
 
@@ -65,10 +66,9 @@ def featurize_candidate_pair_with_representation(
             random_seed = 0
         g = torch.Generator().manual_seed(int(random_seed))
         rep = torch.randn(dim, generator=g, dtype=torch.float32)
-    elif representation == "pga_feature":
-        # passive motor-like feature baseline only
-        se3 = transform_to_representation(T_ab.unsqueeze(0), "dual_quaternion").squeeze(0)
-        rep = se3
+    elif representation in {"pga_feature", "pga_sandwich", "motordock_pga"}:
+        M = se3_to_motor(T_ab.unsqueeze(0)).squeeze(0)
+        rep = motor_to_features(M.unsqueeze(0), include_full=False).squeeze(0)
     elif representation == "matrix":
         rep = transform_to_representation(T_ab.unsqueeze(0), "matrix").squeeze(0)
     elif representation == "shuffled_pairs":

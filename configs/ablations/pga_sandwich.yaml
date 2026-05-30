@@ -1,13 +1,16 @@
 representation:
-  name: pga_feature
+  name: pga_sandwich
   matrix_mode: 3x4
   max_rotation_scale: 0.5
   max_translation_scale: 5.0
   parameter_budget_mode: matched
-  note: passive PGA feature only; no sandwich action; no Clifford-specific claim
+  note: true PGA sandwich-action adapter
+
+model:
+  disable_pair_context: false
 
 train:
   lambda_pair_motor: 0.05
 
 output:
-  run_dir: runs/representation_ablation_debug/pga_feature
+  run_dir: runs/representation_ablation_debug/pga_sandwich

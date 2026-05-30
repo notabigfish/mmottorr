@@ -1,0 +1,8 @@
+representation:
+  name: pga_feature
+
+loss:
+  lambda_pga_geodesic: 1.0
+  lambda_pga_action: 0.1
+  lambda_pga_coeff: 0.01
+  lambda_pga_unit: 0.001

@@ -69,6 +69,12 @@ PYTHONPATH=. python scripts/compare_baseline_motordock.py \
 1. Quaternion, dual-quaternion, matrix, SE(3), and PGA variants run under matched settings.
 2. PGA is not claimed unless it outperforms simpler variants.
 
+PGA variants:
+- `pga_feature`: passive PGA motor feature baseline only. It uses motor coefficients as features and does not apply sandwich action.
+- `pga_sandwich`: true PGA/Clifford motor adapter. It applies sandwich group action on geometric primitives inside the network.
+
+Claims about Clifford/PGA-specific benefits must come from `pga_sandwich`, not from `pga_feature`.
+
 ```bash
 bash scripts/run_ablation_debug.sh
 ```

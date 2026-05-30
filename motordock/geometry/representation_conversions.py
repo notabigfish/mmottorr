@@ -42,7 +42,7 @@ def representation_dim(representation: str, matrix_mode: str = "3x4") -> int:
     if representation == "random_motor": return 6
     if representation == "shuffled_pairs": return 6
     if representation == "no_pair_context": return 6
-    if representation == "pga_feature": return 8
+    if representation in {"pga_feature", "pga_sandwich", "motordock_pga"}: return 8
     raise ValueError(representation)
 
 

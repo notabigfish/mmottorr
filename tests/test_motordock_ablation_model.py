@@ -15,7 +15,7 @@ def _batch(F):
 
 
 def test_ablation_model_forward_all_representations():
-    for r in ["se3_log","quaternion_translation","dual_quaternion","matrix","centroid_bias","random_motor","shuffled_pairs","no_pair_context","pga_feature"]:
+    for r in ["se3_log","quaternion_translation","dual_quaternion","matrix","centroid_bias","random_motor","shuffled_pairs","no_pair_context","pga_feature","pga_sandwich"]:
         F = representation_pair_feature_dim(r)
         m = MotorDockAblationModel(24,18,F,representation=r,hidden_dim=32)
         o = m(_batch(F))
