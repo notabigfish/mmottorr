@@ -1,0 +1,59 @@
+seed: 42
+
+data:
+  csv_path: data/pdbbind/pdbbind_ft.csv
+  output_dir: data/pdbbind
+  split_train: train
+  split_val: val
+  max_train_examples: 128
+  max_val_examples: 32
+  require_pocket: true
+  max_ligand_atoms: 128
+  max_protein_residues: 1022
+
+model:
+  hidden_dim: 128
+  num_layers: 2
+  dropout: 0.1
+
+train:
+  batch_size: 4
+  num_workers: 2
+  epochs: 3
+  lr: 0.0003
+  weight_decay: 0.00001
+  grad_clip_norm: 1.0
+  use_amp: true
+  log_interval: 5
+  val_interval: 1
+
+pose_noise:
+  max_translation: 10.0
+  max_rotation_degrees: 180.0
+
+diffusion:
+  num_steps: 20
+  sigma_tr_min: 0.1
+  sigma_tr_max: 10.0
+  sigma_rot_min: 0.05
+  sigma_rot_max: 1.5
+  schedule_type: log_linear
+  deterministic_eval: true
+  init_translation_sigma: 10.0
+  center_init: pocket
+  max_step_norm_tr: null
+  max_step_norm_rot: null
+
+train_diffusion:
+  lambda_tr: 1.0
+  lambda_rot: 1.0
+  val_mode: dual
+  sampling_val_num_samples: 5
+
+eval:
+  num_samples: 5
+  success_threshold: 2.0
+
+output:
+  run_dir: runs/diffusion_baseline_debug
+  save_every: 1

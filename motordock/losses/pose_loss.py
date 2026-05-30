@@ -28,3 +28,25 @@ def rigid_docking_loss(outputs: dict, batch: dict, coord_weight: float = 1.0, se
     total = coord_weight * coord + se3_weight * se3
     rmsd = masked_ligand_rmsd(outputs["ligand_coords_pred"], batch["ligand_coords_true"], batch["ligand_mask"]) 
     return {"total": total, "coord_loss": coord, "se3_loss": se3, "rmsd": rmsd}
+
+
+def diffusion_rigid_loss(
+    model_out: dict,
+    batch_targets: dict,
+    sigma_tr: torch.Tensor,
+    sigma_rot: torch.Tensor,
+    lambda_tr: float = 1.0,
+    lambda_rot: float = 1.0,
+) -> dict:
+    s_tr_hat = model_out["tr_score_pred"]
+    s_rot_hat = model_out["rot_score_pred"]
+    s_tr_tgt = batch_targets["target_tr_score"]
+    s_rot_tgt = batch_targets["target_rot_score"]
+
+    tr_w = sigma_tr.view(-1, 1).pow(2)
+    rot_w = sigma_rot.view(-1, 1).pow(2)
+
+    l_tr = (tr_w * (s_tr_hat - s_tr_tgt).pow(2).sum(dim=-1, keepdim=True)).mean()
+    l_rot = (rot_w * (s_rot_hat - s_rot_tgt).pow(2).sum(dim=-1, keepdim=True)).mean()
+    total = lambda_tr * l_tr + lambda_rot * l_rot
+    return {"total": total, "tr_loss": l_tr, "rot_loss": l_rot}

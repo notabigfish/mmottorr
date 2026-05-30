@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader
 
 from motordock.train.checkpointing import load_checkpoint
 from motordock.data import PDBBindBaselineDataset, baseline_collate_fn
-from motordock.models import BaselineDockingModel
+from motordock.models import BaselineDockingModel, DiffusionDockingModel
 from motordock.train.validate_baseline import validate_multi_sample
 
 
@@ -17,6 +17,7 @@ if __name__ == "__main__":
     ap.add_argument("--config", required=True)
     ap.add_argument("--split", default="val")
     ap.add_argument("--num-samples", type=int, default=5)
+    ap.add_argument("--sampler", choices=["diffusion", "one_step"], default="diffusion")
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
 
@@ -33,12 +34,27 @@ if __name__ == "__main__":
     dl = DataLoader(ds, batch_size=cfg["train"]["batch_size"], shuffle=False, num_workers=cfg["train"]["num_workers"], collate_fn=baseline_collate_fn)
 
     sample = ds[0]
-    m = BaselineDockingModel(sample["protein_feat"].shape[-1], sample["ligand_atom_feat"].shape[-1], cfg["model"]["hidden_dim"], cfg["model"]["num_layers"], cfg["model"]["dropout"])
-    m.load_state_dict(ck["model_state_dict"])
+    if args.sampler == "diffusion":
+        m = DiffusionDockingModel(sample["protein_feat"].shape[-1], sample["ligand_atom_feat"].shape[-1], cfg["model"]["hidden_dim"], cfg["model"]["num_layers"], cfg["model"].get("dropout", 0.1))
+    else:
+        m = BaselineDockingModel(sample["protein_feat"].shape[-1], sample["ligand_atom_feat"].shape[-1], cfg["model"]["hidden_dim"], cfg["model"]["num_layers"], cfg["model"]["dropout"])
+
+    try:
+        m.load_state_dict(ck["model_state_dict"])
+    except Exception as e:
+        raise RuntimeError(f"checkpoint incompatible with sampler={args.sampler}: {e}")
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     m.to(device)
 
-    res = validate_multi_sample(m, dl, device, num_samples=args.num_samples)
+    res = validate_multi_sample(
+        m,
+        dl,
+        device,
+        num_samples=args.num_samples,
+        sampler=args.sampler,
+        schedule_cfg=cfg.get("diffusion", None),
+    )
     import pandas as pd
     pd.DataFrame([res]).to_csv(args.out, index=False)
     print(res)

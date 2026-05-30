@@ -4,6 +4,9 @@ import torch
 from motordock.losses.pose_loss import rigid_docking_loss
 from motordock.eval.metrics_pose import ligand_rmsd, centroid_distance, success_rate
 from motordock.eval.metrics_confidence import top1_by_confidence
+from motordock.diffusion.noise_schedule import DiffusionSchedule
+from motordock.models.pose_sampler import DiffusionPoseSampler
+from motordock.infer.pose_sampler import OneStepPoseSampler
 
 
 def _to_device(batch, device):
@@ -11,6 +14,30 @@ def _to_device(batch, device):
     for k, v in batch.items():
         out[k] = v.to(device) if torch.is_tensor(v) else v
     return out
+
+
+def _build_sampler(model, sampler: str, num_samples: int, schedule_cfg: dict | None = None):
+    if sampler == "one_step":
+        return OneStepPoseSampler(model, num_samples=num_samples)
+    schedule_cfg = schedule_cfg or {}
+    sched = DiffusionSchedule(
+        num_steps=int(schedule_cfg.get("num_steps", 20)),
+        sigma_tr_min=float(schedule_cfg.get("sigma_tr_min", 0.1)),
+        sigma_tr_max=float(schedule_cfg.get("sigma_tr_max", 10.0)),
+        sigma_rot_min=float(schedule_cfg.get("sigma_rot_min", 0.05)),
+        sigma_rot_max=float(schedule_cfg.get("sigma_rot_max", 1.5)),
+        schedule_type=str(schedule_cfg.get("schedule_type", "log_linear")),
+    )
+    return DiffusionPoseSampler(
+        model,
+        sched,
+        num_samples=num_samples,
+        deterministic=bool(schedule_cfg.get("deterministic", False)),
+        center_init=str(schedule_cfg.get("center_init", "pocket")),
+        init_translation_sigma=float(schedule_cfg.get("init_translation_sigma", sched.sigma_tr_max)),
+        max_step_norm_tr=schedule_cfg.get("max_step_norm_tr", None),
+        max_step_norm_rot=schedule_cfg.get("max_step_norm_rot", None),
+    )
 
 
 @torch.no_grad()
@@ -43,22 +70,33 @@ def validate_one_sample(model, dataloader, device, config) -> dict:
 
 
 @torch.no_grad()
-def validate_multi_sample(model, dataloader, device, num_samples: int = 5) -> dict:
+def validate_multi_sample(
+    model,
+    dataloader,
+    device,
+    num_samples: int = 5,
+    sampler: str = "one_step",
+    schedule_cfg: dict | None = None,
+) -> dict:
     model.eval()
     all_r = []
     all_c = []
+    pose_sampler = _build_sampler(model, sampler=sampler, num_samples=num_samples, schedule_cfg=schedule_cfg)
+
     for batch in dataloader:
         b = _to_device(batch, device)
-        rs, cs = [], []
-        for _ in range(num_samples):
-            out = model(b)
-            r = ligand_rmsd(out["ligand_coords_pred"], b["ligand_coords_true"], b["ligand_mask"])
-            rs.append(r)
-            cs.append(out["confidence_logit"])
-        rmat = torch.stack(rs, dim=1)
-        cmat = torch.stack(cs, dim=1)
-        all_r.append(rmat.cpu())
-        all_c.append(cmat.cpu())
+        samp_out = pose_sampler.sample(b)
+        coords = samp_out["coords"]
+        conf = samp_out["confidence_logit"]
+
+        B, S = coords.shape[:2]
+        true = b["ligand_coords_true"].unsqueeze(1).expand(B, S, -1, -1)
+        mask = b["ligand_mask"].unsqueeze(1).expand(B, S, -1)
+        r = ligand_rmsd(coords.reshape(B * S, *coords.shape[2:]), true.reshape(B * S, *true.shape[2:]), mask.reshape(B * S, -1))
+        r = r.view(B, S)
+
+        all_r.append(r.cpu())
+        all_c.append(conf.cpu())
 
     rmsd_mat = torch.cat(all_r, dim=0)
     conf_mat = torch.cat(all_c, dim=0)

@@ -78,3 +78,15 @@ Claims about Clifford/PGA-specific benefits must come from `pga_sandwich`, not f
 ```bash
 bash scripts/run_ablation_debug.sh
 ```
+
+## Change log
+### Diffusion pose sampler
+- Added iterative ligand rigid-pose diffusion over translation and rotation.
+- Added score-matching training targets.
+- Replaced toy pose sampler behavior that returned `range(num_samples)`.
+- Added CPU tests for sampler shape, finite training targets, denoising behavior, and gradient flow.
+
+### Diffusion baseline training
+- Added dedicated end-to-end diffusion trainer: `scripts/train_diffusion_baseline.py`.
+- Adds diffusion-native validation with score loss and sampler-based RMSD metrics.
+- Produces diffusion checkpoints (`model_type: diffusion_baseline`) for direct `--sampler diffusion` eval/infer.
