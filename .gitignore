@@ -144,6 +144,6 @@ model_params.txt
 *.ckpt*
 results.txt
 
-data/
+/data/
 runs/
 sotas/
