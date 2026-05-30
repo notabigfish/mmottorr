@@ -72,7 +72,7 @@ class MotorDockAblationModel(nn.Module):
         l_ctx = masked_mean(l_h, batch["ligand_mask"], dim=1)
 
         pair_h = self.pair_enc(batch["pair_features"], batch["pair_mask"])
-        ad = self.adapter(pair_h, l_ctx, p_ctx, batch["pair_T_input"], batch["pair_mask"])
+        ad = self.adapter(pair_h, l_ctx, p_ctx, batch["pair_T_input"], batch["pair_mask"], batch=batch)
 
         if self.use_pair_attention:
             pair_ctx, pair_attn = self.pair_pool(pair_h, p_ctx + l_ctx, batch["pair_mask"])

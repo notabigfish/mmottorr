@@ -103,3 +103,9 @@ bash scripts/run_ablation_debug.sh
 - Added pb_valid and pb_valid_no_rmsd summary columns.
 - Added CLI script for PoseBusters evaluation.
 - Added tests for SDF export, input table creation, unavailable PoseBusters behavior, and mocked PoseBusters reporting.
+
+### Random-motor ablation fix
+- Replaced learned RandomMotorAdapter placeholder with a frozen random SE(3) ablation.
+- Added deterministic per-complex random motors using stable hashing.
+- Added valid SE(3) generation through se3_exp_map.
+- Added tests for reproducibility, zero trainable parameters, valid transforms, and no-gradient behavior.
