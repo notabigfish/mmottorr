@@ -8,7 +8,12 @@ def test_collate_pads_variable_lengths():
         "pocket_mask": torch.ones(3, dtype=torch.long), "domain_mask": torch.ones(3, dtype=torch.long),
         "ligand_atom_feat": torch.randn(4, 18), "ligand_coords_true": torch.randn(4, 3), "ligand_coords_start": torch.randn(4, 3), "ligand_mask": torch.ones(4, dtype=torch.bool),
         "pocket_center": torch.randn(3), "T_noise": torch.eye(4), "T_target": torch.eye(4), "affinity": 0.0,
-        "pdb_id": "a", "motordock_type": "x", "ligand_file": "l", "protein_file": "p", "pocket_file": "k", "split": "train"
+        "pdb_id": "a", "motordock_type": "x", "ligand_file": "l", "protein_file": "p", "pocket_file": "k", "split": "train",
+        "torsion_bond_atom_j": torch.zeros(0, dtype=torch.long),
+        "torsion_bond_atom_k": torch.zeros(0, dtype=torch.long),
+        "torsion_atom_mask": torch.zeros(0, 4, dtype=torch.bool), 
+        "torsion_valid_mask": torch.zeros(0, dtype=torch.bool),
+        "torsion_angles_0": torch.zeros(0, dtype=torch.float32)
     }
     b2 = {
         **b1,

@@ -6,7 +6,7 @@ import torch
 import pandas as pd
 from torch.utils.data import Dataset
 
-from .ligand_featurizer import load_ligand_mol, get_ligand_coordinates, featurize_ligand_mol
+from .ligand_featurizer import load_ligand_mol, get_ligand_coordinates, featurize_ligand_mol, random_truncate
 from .residue_featurizer import featurize_protein_sequence
 from .pose_noise import randomize_ligand_pose
 from motordock.chem.torsions import (
@@ -40,7 +40,7 @@ class PDBBindBaselineDataset(Dataset):
         max_translation: float = 10.0,
         max_rotation_degrees: float = 180.0,
         seed: int = 0,
-        prevalidate: bool = True,
+        prevalidate: bool = False,
         debug_raise: bool = False,
     ):
         self.output_dir = Path(output_dir)
@@ -109,7 +109,7 @@ class PDBBindBaselineDataset(Dataset):
         mol = load_ligand_mol(lig_file, sanitize=self.sanitize_ligand)
         if mol is None:
             raise SampleError(pdb_id, f"failed ligand parsing: {lig_file}")
-
+        mol = random_truncate(mol, self.max_ligand_atoms)
         lig_coords_true = get_ligand_coordinates(mol).float()
         assert_atom_count_matches_coords(mol, lig_coords_true)
         if lig_coords_true.shape[0] > self.max_ligand_atoms:
@@ -187,3 +187,4 @@ class PDBBindBaselineDataset(Dataset):
     def __getitem__(self, idx):
         real_idx = self.valid_indices[idx]
         return self._load_raw(real_idx, validate_only=False)
+

@@ -1,0 +1,70 @@
+seed: 42
+
+data:
+  csv_path: data/pdbbind/pdbbind_ft.csv
+  output_dir: data/pdbbind
+  split_train: train
+  split_val: val
+  max_train_examples: null
+  max_val_examples: null
+  require_pocket: true
+  max_ligand_atoms: 128
+  max_protein_residues: 1022
+  max_candidate_pairs: 16
+
+model:
+  name: motordock_diffusion
+  adapter_type: se3
+  hidden_dim: 256
+  num_layers: 4
+  dropout: 0.1
+  sigma_emb_dim: 64
+  use_pair_attention: true
+  disable_pair_context: false
+  use_motor_auxiliary: true
+  max_pair_rotation_scale: 0.5
+  max_pair_translation_scale: 5.0
+
+train:
+  batch_size: 8
+  num_workers: 4
+  epochs: 50
+  lr: 0.0003
+  weight_decay: 0.00001
+  grad_clip_norm: 1.0
+  use_amp: true
+  log_interval: 10
+  val_interval: 1
+
+pose_noise:
+  max_translation: 10.0
+  max_rotation_degrees: 180.0
+
+diffusion:
+  num_steps: 20
+  num_samples_eval: 20
+  sigma_tr_max: 10.0
+  sigma_tr_min: 0.1
+  sigma_rot_max: 1.5
+  sigma_rot_min: 0.05
+  sigma_tor_max: 3.14159
+  sigma_tor_min: 0.05
+  ode: false
+  temperature: 1.0
+
+candidate_scoring:
+  pose: 1.0
+  contact: 0.5
+  motor: 0.25
+  validity: 0.5
+
+loss:
+  lambda_tr: 1.0
+  lambda_rot: 1.0
+  lambda_tor: 1.0
+  lambda_conf: 0.0
+  lambda_motor: 0.0
+  lambda_contact: 0.0
+
+output:
+  run_dir: runs/motordock_diffusion_pdbbind

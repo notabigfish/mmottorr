@@ -8,6 +8,7 @@ from .rigid_pose import (
     prepare_diffusion_batch_targets,
 )
 from .torsion import wrap_angle, apply_torsion_updates, perturb_torsions, torsion_score_loss
+from .motordock_diffusion_sampler import sample_motordock_diffusion
 
 __all__ = [
     "DiffusionSchedule",
@@ -21,4 +22,5 @@ __all__ = [
     "apply_torsion_updates",
     "perturb_torsions",
     "torsion_score_loss",
+    "sample_motordock_diffusion",
 ]

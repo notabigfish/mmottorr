@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import torch
+import random
 from rdkit import Chem, RDLogger, rdBase
 RDLogger.DisableLog("rdApp.*")
 rdBase.DisableLog("rdApp.*")
@@ -67,3 +68,17 @@ def featurize_ligand_mol(mol: Chem.Mol) -> torch.Tensor:
         f.append(atom.GetMass() * 0.01)
         feats.append(f)
     return torch.tensor(feats, dtype=torch.float32)
+
+def random_truncate(mol, max_atoms):
+    num_atoms = mol.GetNumAtoms()
+    if num_atoms <= max_atoms:
+        return mol
+    else:
+        max_start = num_atoms - max_atoms
+        random_start = random.randint(0, max_start)
+        keep_atoms = set(range(random_start, random_start + max_atoms))
+        rw_mol = Chem.RWMol(mol)
+        for idx in range(num_atoms - 1, -1, -1):
+            if idx not in keep_atoms:
+                rw_mol.RemoveAtom(idx)
+        return rw_mol.GetMol()

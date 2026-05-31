@@ -13,6 +13,11 @@ def _sample(c):
         "pair_T_input": torch.eye(4).unsqueeze(0).repeat(c, 1, 1), "pair_T_native": torch.eye(4).unsqueeze(0).repeat(c, 1, 1),
         "pair_T_target_residual": torch.eye(4).unsqueeze(0).repeat(c, 1, 1), "pair_valid": torch.ones(c, dtype=torch.bool),
         "pair_was_perturbed": torch.zeros(c, dtype=torch.bool), "pair_ids": [f"id{i}" for i in range(c)], "pair_types": ["single"] * c,
+        "torsion_bond_atom_j": torch.zeros(0, dtype=torch.long),
+        "torsion_bond_atom_k": torch.zeros(0, dtype=torch.long),
+        "torsion_atom_mask": torch.zeros(0, 4, dtype=torch.bool), 
+        "torsion_valid_mask": torch.zeros(0, dtype=torch.bool),
+        "torsion_angles_0": torch.zeros(0, dtype=torch.float32)
     }
 
 

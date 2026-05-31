@@ -8,7 +8,7 @@ data:
   max_train_examples: 128
   max_val_examples: 32
   require_pocket: true
-  max_ligand_atoms: 128
+  max_ligand_atoms: 300
   max_protein_residues: 1022
   max_candidate_pairs: 16
 

@@ -91,6 +91,12 @@ bash scripts/run_ablation_debug.sh
 - Adds diffusion-native validation with score loss and sampler-based RMSD metrics.
 - Produces diffusion checkpoints (`model_type: diffusion_baseline`) for direct `--sampler diffusion` eval/infer.
 
+### MotorDock diffusion
+```bash
+PYTHONPATH=. python scripts/train_motordock_diffusion.py --config configs/motordock_diffusion_pdbbind.yaml
+PYTHONPATH=. python scripts/eval_motordock_diffusion.py --checkpoint runs/motordock_diffusion_pdbbind/best.pt --config configs/motordock_diffusion_pdbbind.yaml --split val --num-samples 20 --out runs/motordock_diffusion_pdbbind/val_eval.csv
+```
+
 ### Ligand torsion modeling
 - Added RDKit-based rotatable bond detection.
 - Added differentiable torsion coordinate updates.
